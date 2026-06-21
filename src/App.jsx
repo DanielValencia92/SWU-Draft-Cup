@@ -498,10 +498,10 @@ function RulesPage() {
         </ul>
 
         <h3>Pod Types</h3>
-        <p>When you report a draft pod, you must declare if it is a:</p>
+        <p>When you report a draft pod, you must declare if it is for:</p>
         <ul>
-          <li><strong>Point Pod</strong> if you want it to count towards one of your 6 max decks and have it be scored for standings.</li>
-          <li><strong>Pool Pod</strong> if you want it to count towards one of your 6 max drafts but not have it be scored for standings.</li>
+          <li><strong>Points + Pool</strong> if you want it to count towards one of your 6 max decks and have it be scored for standings.</li>
+          <li><strong>Pool Only</strong> if you want it to count towards one of your 6 max drafts but not have it be scored for standings.</li>
         </ul>
 
         <h2>🏅 Match Scoring (Draft Phase)</h2>
