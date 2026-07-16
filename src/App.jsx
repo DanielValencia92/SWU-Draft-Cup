@@ -494,7 +494,7 @@ function RulesPage() {
         <h3>Guidelines for Reporting</h3>
         <ul>
           <li>Before you physically start drafting, post a single message stating that you are reporting and who else is in your pod.</li>
-          <li>You have until the end of the following day to post a single message that contains your drafted pool and the melee link.</li>
+          <li>You have until the end of the day to post the melee link and pictures of your drafted pool to your forum thread. Please see the discord server for more information.</li>
         </ul>
 
         <h3>Pod Types</h3>
