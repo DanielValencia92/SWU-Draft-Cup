@@ -5,7 +5,8 @@ import { getHeaderIndex, getOptionalHeaderIndex, normalizeHeader, parseCSV } fro
 const routes = {
   standings: 'standings',
   champions: 'champions',
-  rules: 'rules'
+  rules: 'rules',
+  parser: 'parser'
 };
 
 function routeFromLocation() {
@@ -28,6 +29,10 @@ function routeFromLocation() {
     return { page: routes.rules };
   }
 
+  if (path === '/tournament-parser.html' || path === '/tournament-parser') {
+    return { page: routes.parser };
+  }
+
   const standingsMatch = path.match(/^\/standings\/([^/]+)$/);
   if (standingsMatch) {
     const set = sets.find(item => item.slug === standingsMatch[1]);
@@ -44,6 +49,9 @@ function pathFor(route) {
   if (route.page === routes.rules) {
     return '/rules';
   }
+  if (route.page === routes.parser) {
+    return '/tournament-parser';
+  }
   return `/standings/${route.setSlug || defaultSet.slug}`;
 }
 
@@ -59,7 +67,7 @@ function App() {
     ? currentSet.pageClass
     : route.page === routes.champions
       ? 'page-champions'
-      : 'page-rules';
+      : route.page === routes.parser ? 'page-parser' : 'page-rules';
 
   useEffect(() => {
     document.body.className = pageClass;
@@ -76,6 +84,8 @@ function App() {
       ? 'SWU Draft Cup - Hall of Champions'
       : route.page === routes.rules
         ? 'SWU Draft Cup - Rules'
+        : route.page === routes.parser
+          ? 'SWU Draft Cup - Tournament Parser'
         : `SWU Draft Cup Standings - ${currentSet.name}`;
     document.title = title;
   }, [currentSet.name, route.page]);
@@ -93,6 +103,7 @@ function App() {
         <main>
           {route.page === routes.champions && <ChampionsPage />}
           {route.page === routes.rules && <RulesPage />}
+          {route.page === routes.parser && <TournamentParserPage />}
           {route.page === routes.standings && (
             <StandingsPage currentSet={currentSet} navigate={navigate} />
           )}
@@ -167,6 +178,9 @@ function SiteHeader({ activePage, navigate }) {
           onClick={() => navigate({ page: routes.rules })}
         >
           Rules
+        </NavLink>
+        <NavLink active={activePage === routes.parser} href={pathFor({ page: routes.parser })} onClick={() => navigate({ page: routes.parser })}>
+          Parser
         </NavLink>
       </nav>
     </header>
@@ -570,6 +584,109 @@ function RulesPage() {
       </section>
     </>
   );
+}
+
+function TournamentParserPage() {
+  const [tournamentUrl, setTournamentUrl] = useState('');
+  const [standings, setStandings] = useState([]);
+  const [selectedPlayers, setSelectedPlayers] = useState(new Set());
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const fetchTournament = async event => {
+    event.preventDefault();
+    const tournamentId = extractTournamentId(tournamentUrl.trim());
+    if (!tournamentId) {
+      setError('Enter a valid Melee.gg tournament URL.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    setStandings([]);
+    setResults([]);
+    try {
+      const response = await fetch(`/.netlify/functions/tournament-standings?tournamentId=${encodeURIComponent(tournamentId)}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || `Request failed with HTTP ${response.status}`);
+      const players = payload.data.map(standing => {
+        const player = standing.Team?.Players?.[0];
+        const name = player?.DisplayName || player?.Username;
+        return name ? { name, wins: standing.MatchWins || 0, losses: standing.MatchLosses || 0, draws: standing.MatchDraws || 0 } : null;
+      }).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+      if (!players.length) throw new Error('No players were found in the tournament standings.');
+      setStandings(players);
+      setSelectedPlayers(new Set(players.map(player => player.name)));
+    } catch (fetchError) {
+      setError(fetchError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const togglePlayer = name => setSelectedPlayers(current => {
+    const next = new Set(current);
+    next.has(name) ? next.delete(name) : next.add(name);
+    return next;
+  });
+
+  const calculateResults = () => {
+    const included = standings.filter(player => selectedPlayers.has(player.name));
+    if (!included.length) {
+      setError('Select at least one player.');
+      setResults([]);
+      return;
+    }
+    const withMmwr = included.map(player => {
+      const totalMatches = player.wins + player.losses + player.draws;
+      return { ...player, mmwr: totalMatches ? (player.wins + 0.5 * player.draws) / totalMatches : 0 };
+    });
+    const calculated = withMmwr.map(player => {
+      const opponents = withMmwr.filter(other => other.name !== player.name);
+      const oppAvgMmwr = opponents.length ? opponents.reduce((total, opponent) => total + opponent.mmwr, 0) / opponents.length : 0.5;
+      const undefeatedBonus = player.losses === 0 && player.wins > 0;
+      return { ...player, oppAvgMmwr, undefeatedBonus, points: player.wins * 3 + player.draws + (undefeatedBonus ? 1 : 0) };
+    });
+    calculated.sort((a, b) => b.points - a.points || b.mmwr - a.mmwr || b.oppAvgMmwr - a.oppAvgMmwr);
+    setError('');
+    setResults(calculated);
+  };
+
+  const totals = results.reduce((summary, player) => ({ wins: summary.wins + player.wins, losses: summary.losses + player.losses, draws: summary.draws + player.draws, points: summary.points + player.points }), { wins: 0, losses: 0, draws: 0, points: 0 });
+
+  return <>
+    <section className="hero"><p className="eyebrow">Event Utility</p><h1>Tournament Parser</h1></section>
+    <form className="surface parser-form" onSubmit={fetchTournament}>
+      <label htmlFor="tournament-url">Melee.gg Tournament URL</label>
+      <div className="parser-input-row">
+        <input id="tournament-url" type="url" value={tournamentUrl} onChange={event => setTournamentUrl(event.target.value)} placeholder="https://melee.gg/Tournament/View/..." />
+        <button type="submit" disabled={loading}>{loading ? 'Fetching…' : 'Fetch Tournament'}</button>
+      </div>
+      <p className="parser-help">Paste a tournament link to load its final-round standings.</p>
+    </form>
+    {error && <p className="surface parser-message error" role="alert">{error}</p>}
+    {loading && <p className="status parser-status">Loading tournament data…</p>}
+    {standings.length > 0 && <section className="surface parser-section">
+      <div className="parser-section-heading"><div><p className="eyebrow">Roster</p><h2>Select Players</h2></div><div className="parser-actions">
+        <button type="button" className="secondary-button" onClick={() => setSelectedPlayers(new Set(standings.map(player => player.name)))}>Select All</button>
+        <button type="button" className="secondary-button" onClick={() => setSelectedPlayers(new Set())}>Deselect All</button>
+        <button type="button" onClick={calculateResults}>Calculate Results</button>
+      </div></div>
+      <div className="player-grid">{standings.map(player => <label className="player-checkbox" key={player.name}><input type="checkbox" checked={selectedPlayers.has(player.name)} onChange={() => togglePlayer(player.name)} /><span>{player.name}</span></label>)}</div>
+    </section>}
+    {results.length > 0 && <section className="parser-results">
+      <div className="stats-summary">{[['Players', results.length], ['Total Wins', totals.wins], ['Total Losses', totals.losses], ['Total Draws', totals.draws], ['Total Points', totals.points]].map(([label, value]) => <div className="surface stat-card" key={label}><strong>{value}</strong><span>{label}</span></div>)}</div>
+      <div className="surface table-scroll"><table className="parser-table"><thead><tr><th>Player</th><th>Wins</th><th>Losses</th><th>Draws</th><th>MMWR</th><th>Opp. Avg MMWR</th><th>Points</th></tr></thead><tbody>{results.map(player => <tr key={player.name}><td>{player.name}</td><td>{player.wins}</td><td>{player.losses}</td><td>{player.draws}</td><td>{player.mmwr.toFixed(3)}</td><td>{player.oppAvgMmwr.toFixed(3)}</td><td><strong>{player.points}</strong>{player.undefeatedBonus ? ' 🏆' : ''}</td></tr>)}</tbody></table></div>
+    </section>}
+  </>;
+}
+
+function extractTournamentId(url) {
+  for (const pattern of [/Tournament\/View\/(\d+)/i, /tournaments\/(\d+)/i, /\/(\d+)\/?$/]) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
 }
 
 function useCsvData(csvUrl, refreshMs, enabled = true) {

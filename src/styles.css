@@ -64,7 +64,8 @@ body::before {
 }
 
 .page-champions,
-.page-rules {
+.page-rules,
+.page-parser {
   --page-art: url('/swh01_starfield.png');
 }
 
@@ -364,6 +365,30 @@ th.group-header {
   font-style: italic;
 }
 
+.parser-form, .parser-section { padding: 22px; margin-bottom: 16px; }
+.parser-form label, .parser-section h2 { display: block; margin: 0 0 10px; color: #fff6cf; font-weight: 900; }
+.parser-input-row, .parser-actions, .parser-section-heading { display: flex; align-items: center; gap: 12px; }
+.parser-input-row input { flex: 1; min-width: 0; min-height: 44px; padding: 0 13px; border: 1px solid var(--line-strong); border-radius: 7px; background: rgba(4, 7, 12, 0.9); color: var(--text); font: inherit; }
+.parser-input-row input:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
+.parser-form button, .parser-actions button { min-height: 44px; padding: 0 16px; border: 1px solid rgba(244, 201, 93, 0.65); border-radius: 7px; background: rgba(244, 201, 93, 0.18); color: #fff6cf; font: inherit; font-weight: 900; cursor: pointer; }
+.parser-form button:hover, .parser-actions button:hover { background: rgba(244, 201, 93, 0.28); }
+.parser-form button:disabled { cursor: wait; opacity: 0.6; }
+.parser-actions .secondary-button { border-color: var(--line-strong); background: rgba(255, 255, 255, 0.07); color: var(--text); }
+.parser-help, .parser-message, .parser-status { color: var(--muted); }
+.parser-help { margin: 10px 0 0; font-size: 0.88rem; }
+.parser-message { padding: 14px 16px; }
+.parser-message.error { border-color: rgba(255, 111, 97, 0.55); color: #ffb3a8; }
+.parser-section-heading { justify-content: space-between; margin-bottom: 18px; }
+.player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.player-checkbox { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: rgba(255, 255, 255, 0.06); cursor: pointer; }
+.player-checkbox:hover { border-color: rgba(244, 201, 93, 0.55); }
+.player-checkbox input { width: 18px; height: 18px; accent-color: var(--gold); }
+.stats-summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 16px 0; }
+.stat-card { display: grid; gap: 4px; padding: 18px; text-align: center; }
+.stat-card strong { color: var(--gold); font-size: 1.8rem; }
+.stat-card span { color: var(--muted); font-size: 0.82rem; font-weight: 800; text-transform: uppercase; }
+.parser-table td:first-child { text-align: left; font-weight: 800; }
+
 @media (max-width: 760px) {
   .site-shell {
     width: min(100% - 20px, 1180px);
@@ -403,4 +428,9 @@ th.group-header {
   .rules-panel {
     padding: 18px;
   }
+
+  .parser-input-row, .parser-section-heading { align-items: stretch; flex-direction: column; }
+  .parser-actions { flex-wrap: wrap; }
+  .parser-actions button { flex: 1 1 140px; }
+  .stats-summary { grid-template-columns: repeat(2, 1fr); }
 }
