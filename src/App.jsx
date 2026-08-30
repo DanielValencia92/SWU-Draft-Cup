@@ -679,17 +679,17 @@ function TournamentParserPage() {
   });
 
   const calculateResults = () => {
-    const included = standings.filter(player => selectedPlayers.has(player.name)).map(player => ({ ...player }));
-    if (!included.length) {
+    if (!selectedPlayers.size) {
       setError('Select at least one player.');
       setResults([]);
       return;
     }
+    const workingStandings = standings.map(player => ({ ...player }));
     for (const match of manualMatches) {
-      const player1 = included.find(player => player.name === match.player1);
-      const player2 = included.find(player => player.name === match.player2);
+      const player1 = workingStandings.find(player => player.name === match.player1);
+      const player2 = workingStandings.find(player => player.name === match.player2);
       if (!player1 || (match.result !== 'bye' && (!player2 || player1 === player2))) {
-        setError('Each manual match must use valid, different selected players.');
+        setError('Each manual match must use valid, different tournament players.');
         setResults([]);
         return;
       }
@@ -698,6 +698,7 @@ function TournamentParserPage() {
       if (match.result === 'draw') { player1.draws += 1; player2.draws += 1; }
       if (match.result === 'bye') { player1.wins += 1; player1.byes += 1; }
     }
+    const included = workingStandings.filter(player => selectedPlayers.has(player.name));
     const withMmwr = included.map(player => {
       const totalMatches = player.wins + player.losses + player.draws;
       return { ...player, mmwr: totalMatches ? (player.wins + 0.5 * player.draws) / totalMatches : 0 };
@@ -736,7 +737,7 @@ function TournamentParserPage() {
         </select>
         <span>Use Round 2 when the final round was never completed in Melee.</span>
       </div>
-      <div className="parser-section-heading"><div><p className="eyebrow">Roster</p><h2>Select Players</h2></div><div className="parser-actions">
+      <div className="parser-section-heading"><div><p className="eyebrow">Member Roster</p><h2>Select Relevant Players</h2><p className="parser-help">Checked players appear in the results and count toward opponent-average MMWR. Unchecked tournament players can still be entered as non-member opponents.</p></div><div className="parser-actions">
         <button type="button" className="secondary-button" onClick={() => setSelectedPlayers(new Set(standings.map(player => player.name)))}>Select All</button>
         <button type="button" className="secondary-button" onClick={() => setSelectedPlayers(new Set())}>Deselect All</button>
         <button type="button" onClick={calculateResults}>Calculate Results</button>
