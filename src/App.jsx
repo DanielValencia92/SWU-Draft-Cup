@@ -588,16 +588,39 @@ function RulesPage() {
 
 function TournamentParserPage() {
   const [tournamentUrl, setTournamentUrl] = useState('');
+  const [tournamentId, setTournamentId] = useState('');
+  const [rounds, setRounds] = useState([]);
+  const [selectedRound, setSelectedRound] = useState('');
   const [standings, setStandings] = useState([]);
   const [selectedPlayers, setSelectedPlayers] = useState(new Set());
+  const [manualMatches, setManualMatches] = useState([]);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const loadStandings = async (id, round = '') => {
+    const roundQuery = round ? `&round=${encodeURIComponent(round)}` : '';
+    const response = await fetch(`/.netlify/functions/tournament-standings?tournamentId=${encodeURIComponent(id)}${roundQuery}`);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `Request failed with HTTP ${response.status}`);
+    const players = payload.data.map(standing => {
+      const player = standing.Team?.Players?.[0];
+      const name = player?.DisplayName || player?.Username;
+      return name ? { name, wins: standing.MatchWins || 0, losses: standing.MatchLosses || 0, draws: standing.MatchDraws || 0, byes: standing.MatchByes || standing.Byes || 0 } : null;
+    }).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+    if (!players.length) throw new Error('No players were found in the selected round standings.');
+    setRounds(payload.rounds || []);
+    setSelectedRound(String(payload.selectedRound));
+    setStandings(players);
+    setSelectedPlayers(new Set(players.map(player => player.name)));
+    setManualMatches([]);
+    setResults([]);
+  };
+
   const fetchTournament = async event => {
     event.preventDefault();
-    const tournamentId = extractTournamentId(tournamentUrl.trim());
-    if (!tournamentId) {
+    const id = extractTournamentId(tournamentUrl.trim());
+    if (!id) {
       setError('Enter a valid Melee.gg tournament URL.');
       return;
     }
@@ -606,23 +629,37 @@ function TournamentParserPage() {
     setStandings([]);
     setResults([]);
     try {
-      const response = await fetch(`/.netlify/functions/tournament-standings?tournamentId=${encodeURIComponent(tournamentId)}`);
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || `Request failed with HTTP ${response.status}`);
-      const players = payload.data.map(standing => {
-        const player = standing.Team?.Players?.[0];
-        const name = player?.DisplayName || player?.Username;
-        return name ? { name, wins: standing.MatchWins || 0, losses: standing.MatchLosses || 0, draws: standing.MatchDraws || 0 } : null;
-      }).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
-      if (!players.length) throw new Error('No players were found in the tournament standings.');
-      setStandings(players);
-      setSelectedPlayers(new Set(players.map(player => player.name)));
+      setTournamentId(id);
+      await loadStandings(id);
     } catch (fetchError) {
       setError(fetchError.message);
     } finally {
       setLoading(false);
     }
   };
+
+  const changeRound = async event => {
+    const round = event.target.value;
+    setSelectedRound(round);
+    setLoading(true);
+    setError('');
+    try {
+      await loadStandings(tournamentId, round);
+    } catch (fetchError) {
+      setError(fetchError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addManualMatch = () => {
+    const first = standings[0]?.name || '';
+    const second = standings.find(player => player.name !== first)?.name || '';
+    setManualMatches(current => [...current, { id: crypto.randomUUID(), player1: first, player2: second, result: 'player1' }]);
+  };
+
+  const updateManualMatch = (id, field, value) => setManualMatches(current => current.map(match => match.id === id ? { ...match, [field]: value } : match));
+  const removeManualMatch = id => setManualMatches(current => current.filter(match => match.id !== id));
 
   const togglePlayer = name => setSelectedPlayers(current => {
     const next = new Set(current);
@@ -631,11 +668,24 @@ function TournamentParserPage() {
   });
 
   const calculateResults = () => {
-    const included = standings.filter(player => selectedPlayers.has(player.name));
+    const included = standings.filter(player => selectedPlayers.has(player.name)).map(player => ({ ...player }));
     if (!included.length) {
       setError('Select at least one player.');
       setResults([]);
       return;
+    }
+    for (const match of manualMatches) {
+      const player1 = included.find(player => player.name === match.player1);
+      const player2 = included.find(player => player.name === match.player2);
+      if (!player1 || (match.result !== 'bye' && (!player2 || player1 === player2))) {
+        setError('Each manual match must use valid, different selected players.');
+        setResults([]);
+        return;
+      }
+      if (match.result === 'player1') { player1.wins += 1; player2.losses += 1; }
+      if (match.result === 'player2') { player2.wins += 1; player1.losses += 1; }
+      if (match.result === 'draw') { player1.draws += 1; player2.draws += 1; }
+      if (match.result === 'bye') { player1.wins += 1; player1.byes += 1; }
     }
     const withMmwr = included.map(player => {
       const totalMatches = player.wins + player.losses + player.draws;
@@ -644,7 +694,7 @@ function TournamentParserPage() {
     const calculated = withMmwr.map(player => {
       const opponents = withMmwr.filter(other => other.name !== player.name);
       const oppAvgMmwr = opponents.length ? opponents.reduce((total, opponent) => total + opponent.mmwr, 0) / opponents.length : 0.5;
-      const undefeatedBonus = player.losses === 0 && player.wins > 0;
+      const undefeatedBonus = player.losses === 0 && player.wins === 3 && player.byes === 0;
       return { ...player, oppAvgMmwr, undefeatedBonus, points: player.wins * 3 + player.draws + (undefeatedBonus ? 1 : 0) };
     });
     calculated.sort((a, b) => b.points - a.points || b.mmwr - a.mmwr || b.oppAvgMmwr - a.oppAvgMmwr);
@@ -662,17 +712,35 @@ function TournamentParserPage() {
         <input id="tournament-url" type="url" value={tournamentUrl} onChange={event => setTournamentUrl(event.target.value)} placeholder="https://melee.gg/Tournament/View/..." />
         <button type="submit" disabled={loading}>{loading ? 'Fetching…' : 'Fetch Tournament'}</button>
       </div>
-      <p className="parser-help">Paste a tournament link to load its final-round standings.</p>
+      <p className="parser-help">Paste a tournament link to load its latest published standings. You can then choose an earlier checkpoint.</p>
     </form>
     {error && <p className="surface parser-message error" role="alert">{error}</p>}
     {loading && <p className="status parser-status">Loading tournament data…</p>}
     {standings.length > 0 && <section className="surface parser-section">
+      <div className="round-picker">
+        <label htmlFor="parser-round">Standings checkpoint</label>
+        <select id="parser-round" value={selectedRound} onChange={changeRound} disabled={loading}>
+          {rounds.map(round => <option key={round.id} value={round.number}>{round.label}</option>)}
+        </select>
+        <span>Use Round 2 when the final round was never completed in Melee.</span>
+      </div>
       <div className="parser-section-heading"><div><p className="eyebrow">Roster</p><h2>Select Players</h2></div><div className="parser-actions">
         <button type="button" className="secondary-button" onClick={() => setSelectedPlayers(new Set(standings.map(player => player.name)))}>Select All</button>
         <button type="button" className="secondary-button" onClick={() => setSelectedPlayers(new Set())}>Deselect All</button>
         <button type="button" onClick={calculateResults}>Calculate Results</button>
       </div></div>
       <div className="player-grid">{standings.map(player => <label className="player-checkbox" key={player.name}><input type="checkbox" checked={selectedPlayers.has(player.name)} onChange={() => togglePlayer(player.name)} /><span>{player.name}</span></label>)}</div>
+      <div className="manual-results">
+        <div className="parser-section-heading"><div><p className="eyebrow">Finish the Pod</p><h2>Manual Match Results</h2></div><button type="button" className="secondary-button add-match-button" onClick={addManualMatch}>Add Match</button></div>
+        {manualMatches.length === 0 && <p className="parser-help">Add any matches played after the selected standings checkpoint.</p>}
+        {manualMatches.map((match, index) => <div className="manual-match" key={match.id}>
+          <span className="match-number">Match {index + 1}</span>
+          <select aria-label={`Match ${index + 1} first player`} value={match.player1} onChange={event => updateManualMatch(match.id, 'player1', event.target.value)}>{standings.map(player => <option key={player.name} value={player.name}>{player.name}</option>)}</select>
+          <select aria-label={`Match ${index + 1} result`} value={match.result} onChange={event => updateManualMatch(match.id, 'result', event.target.value)}><option value="player1">defeated</option><option value="player2">lost to</option><option value="draw">drew with</option><option value="bye">received a bye</option></select>
+          {match.result !== 'bye' && <select aria-label={`Match ${index + 1} second player`} value={match.player2} onChange={event => updateManualMatch(match.id, 'player2', event.target.value)}>{standings.map(player => <option key={player.name} value={player.name}>{player.name}</option>)}</select>}
+          <button type="button" className="remove-match-button" aria-label={`Remove match ${index + 1}`} onClick={() => removeManualMatch(match.id)}>Remove</button>
+        </div>)}
+      </div>
     </section>}
     {results.length > 0 && <section className="parser-results">
       <div className="stats-summary">{[['Players', results.length], ['Total Wins', totals.wins], ['Total Losses', totals.losses], ['Total Draws', totals.draws], ['Total Points', totals.points]].map(([label, value]) => <div className="surface stat-card" key={label}><strong>{value}</strong><span>{label}</span></div>)}</div>

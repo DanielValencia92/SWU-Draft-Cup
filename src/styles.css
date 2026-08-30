@@ -388,6 +388,15 @@ th.group-header {
 .stat-card strong { color: var(--gold); font-size: 1.8rem; }
 .stat-card span { color: var(--muted); font-size: 0.82rem; font-weight: 800; text-transform: uppercase; }
 .parser-table td:first-child { text-align: left; font-weight: 800; }
+.round-picker { display: grid; grid-template-columns: auto minmax(130px, 190px) 1fr; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.round-picker label { margin: 0; color: #fff6cf; font-weight: 900; }
+.round-picker span { color: var(--muted); font-size: 0.88rem; }
+.round-picker select, .manual-match select { min-height: 42px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 7px; background: rgba(4, 7, 12, 0.95); color: var(--text); font: inherit; }
+.manual-results { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); }
+.add-match-button, .remove-match-button { min-height: 42px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 7px; background: rgba(255,255,255,.07); color: var(--text); font: inherit; font-weight: 800; cursor: pointer; }
+.manual-match { display: grid; grid-template-columns: auto minmax(140px, 1fr) minmax(125px, auto) minmax(140px, 1fr) auto; align-items: center; gap: 10px; margin-top: 10px; }
+.match-number { color: var(--gold); font-size: .78rem; font-weight: 900; text-transform: uppercase; }
+.remove-match-button { color: #ffb3a8; }
 
 @media (max-width: 760px) {
   .site-shell {
@@ -433,4 +442,6 @@ th.group-header {
   .parser-actions { flex-wrap: wrap; }
   .parser-actions button { flex: 1 1 140px; }
   .stats-summary { grid-template-columns: repeat(2, 1fr); }
+  .round-picker { grid-template-columns: 1fr; }
+  .manual-match { grid-template-columns: 1fr; padding: 14px; border: 1px solid var(--line); border-radius: 7px; }
 }

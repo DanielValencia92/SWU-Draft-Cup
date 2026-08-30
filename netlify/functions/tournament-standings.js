@@ -4,22 +4,31 @@ const meleeHeaders = {
 };
 
 export default async request => {
-  const tournamentId = new URL(request.url).searchParams.get('tournamentId');
+  const requestUrl = new URL(request.url);
+  const tournamentId = requestUrl.searchParams.get('tournamentId');
   if (!/^\d+$/.test(tournamentId || '')) return Response.json({ error: 'A valid numeric tournament ID is required.' }, { status: 400 });
   try {
     const tournamentResponse = await fetch(`https://melee.gg/Tournament/View/${tournamentId}`, { headers: meleeHeaders });
     if (!tournamentResponse.ok) throw new Error(`Melee.gg tournament request failed with HTTP ${tournamentResponse.status}`);
     const html = await tournamentResponse.text();
-    const roundIds = [...html.matchAll(/<button(?=[^>]*\bround-selector\b)(?=[^>]*\bdata-id=["'](\d+)["'])[^>]*>/gi)].map(match => match[1]);
+    const roundIds = [...new Set([...html.matchAll(/<button(?=[^>]*\bround-selector\b)(?=[^>]*\bdata-id=["'](\d+)["'])[^>]*>/gi)].map(match => match[1]))];
     if (!roundIds.length) throw new Error('Could not find the tournament round selector. The event may not have published standings yet.');
+    const requestedRound = Number.parseInt(requestUrl.searchParams.get('round') || '', 10);
+    const roundNumber = Number.isInteger(requestedRound) && requestedRound >= 1 && requestedRound <= roundIds.length
+      ? requestedRound
+      : roundIds.length;
     const response = await fetch('https://melee.gg/Standing/GetRoundStandings', {
       method: 'POST',
       headers: { ...meleeHeaders, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
-      body: createStandingsForm(roundIds.at(-1)).toString()
+      body: createStandingsForm(roundIds[roundNumber - 1]).toString()
     });
     if (!response.ok) throw new Error(`Melee.gg standings request failed with HTTP ${response.status}`);
     const standings = await response.json();
-    return Response.json({ data: standings.data || [] });
+    return Response.json({
+      data: standings.data || [],
+      selectedRound: roundNumber,
+      rounds: roundIds.map((id, index) => ({ id, number: index + 1, label: `Round ${index + 1}` }))
+    });
   } catch (error) {
     console.error('Tournament parser error:', error);
     return Response.json({ error: error.message || 'Unable to load tournament standings.' }, { status: 502 });
