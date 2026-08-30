@@ -378,6 +378,7 @@ th.group-header {
 .parser-help { margin: 10px 0 0; font-size: 0.88rem; }
 .parser-message { padding: 14px 16px; }
 .parser-message.error { border-color: rgba(255, 111, 97, 0.55); color: #ffb3a8; }
+.parser-message.parser-notice { border-color: rgba(244, 201, 93, 0.45); color: #fff2a8; }
 .parser-section-heading { justify-content: space-between; margin-bottom: 18px; }
 .player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
 .player-checkbox { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: rgba(255, 255, 255, 0.06); cursor: pointer; }

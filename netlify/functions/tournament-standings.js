@@ -14,16 +14,18 @@ export default async request => {
     const roundIds = [...new Set([...html.matchAll(/<button(?=[^>]*\bround-selector\b)(?=[^>]*\bdata-id=["'](\d+)["'])[^>]*>/gi)].map(match => match[1]))];
     if (!roundIds.length) throw new Error('Could not find the tournament round selector. The event may not have published standings yet.');
     const requestedRound = Number.parseInt(requestUrl.searchParams.get('round') || '', 10);
-    const roundNumber = Number.isInteger(requestedRound) && requestedRound >= 1 && requestedRound <= roundIds.length
-      ? requestedRound
-      : roundIds.length;
-    const response = await fetch('https://melee.gg/Standing/GetRoundStandings', {
-      method: 'POST',
-      headers: { ...meleeHeaders, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
-      body: createStandingsForm(roundIds[roundNumber - 1]).toString()
-    });
-    if (!response.ok) throw new Error(`Melee.gg standings request failed with HTTP ${response.status}`);
-    const standings = await response.json();
+    const hasValidRequestedRound = Number.isInteger(requestedRound) && requestedRound >= 1 && requestedRound <= roundIds.length;
+    const roundsToTry = hasValidRequestedRound
+      ? [requestedRound]
+      : Array.from({ length: roundIds.length }, (_, index) => roundIds.length - index);
+    let roundNumber = roundsToTry[0];
+    let standings = { data: [] };
+
+    for (const candidateRound of roundsToTry) {
+      standings = await fetchRoundStandings(roundIds[candidateRound - 1]);
+      roundNumber = candidateRound;
+      if (standings.data?.length || hasValidRequestedRound) break;
+    }
     return Response.json({
       data: standings.data || [],
       selectedRound: roundNumber,
@@ -34,6 +36,16 @@ export default async request => {
     return Response.json({ error: error.message || 'Unable to load tournament standings.' }, { status: 502 });
   }
 };
+
+async function fetchRoundStandings(roundId) {
+  const response = await fetch('https://melee.gg/Standing/GetRoundStandings', {
+    method: 'POST',
+    headers: { ...meleeHeaders, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
+    body: createStandingsForm(roundId).toString()
+  });
+  if (!response.ok) throw new Error(`Melee.gg standings request failed with HTTP ${response.status}`);
+  return response.json();
+}
 
 function createStandingsForm(roundId) {
   const form = new URLSearchParams({ draw: '1', start: '0', length: '1000', 'search[value]': '', 'search[regex]': 'false', 'order[0][column]': '0', 'order[0][dir]': 'asc', roundId });

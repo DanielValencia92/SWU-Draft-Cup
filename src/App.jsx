@@ -594,6 +594,7 @@ function TournamentParserPage() {
   const [standings, setStandings] = useState([]);
   const [selectedPlayers, setSelectedPlayers] = useState(new Set());
   const [manualMatches, setManualMatches] = useState([]);
+  const [fallbackNotice, setFallbackNotice] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -611,6 +612,9 @@ function TournamentParserPage() {
     if (!players.length) throw new Error('No players were found in the selected round standings.');
     setRounds(payload.rounds || []);
     setSelectedRound(String(payload.selectedRound));
+    setFallbackNotice(!round && payload.selectedRound < (payload.rounds?.length || 0)
+      ? `The latest round has no standings, so Round ${payload.selectedRound} was loaded automatically.`
+      : '');
     setStandings(players);
     setSelectedPlayers(new Set(players.map(player => player.name)));
     setManualMatches([]);
@@ -715,6 +719,7 @@ function TournamentParserPage() {
       <p className="parser-help">Paste a tournament link to load its latest published standings. You can then choose an earlier checkpoint.</p>
     </form>
     {error && <p className="surface parser-message error" role="alert">{error}</p>}
+    {fallbackNotice && <p className="surface parser-message parser-notice">{fallbackNotice}</p>}
     {loading && <p className="status parser-status">Loading tournament data…</p>}
     {standings.length > 0 && <section className="surface parser-section">
       <div className="round-picker">
