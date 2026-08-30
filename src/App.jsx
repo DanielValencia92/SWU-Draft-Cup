@@ -659,10 +659,17 @@ function TournamentParserPage() {
   const addManualMatch = () => {
     const first = standings[0]?.name || '';
     const second = standings.find(player => player.name !== first)?.name || '';
-    setManualMatches(current => [...current, { id: crypto.randomUUID(), player1: first, player2: second, result: 'player1' }]);
+    setManualMatches(current => [...current, { id: crypto.randomUUID(), player1: first, player2: second, result: 'player1', score: '2-0' }]);
   };
 
-  const updateManualMatch = (id, field, value) => setManualMatches(current => current.map(match => match.id === id ? { ...match, [field]: value } : match));
+  const updateManualMatch = (id, field, value) => setManualMatches(current => current.map(match => {
+    if (match.id !== id) return match;
+    if (field === 'result') {
+      const defaultScores = { player1: '2-0', player2: '0-2', draw: '', bye: '' };
+      return { ...match, result: value, score: defaultScores[value] };
+    }
+    return { ...match, [field]: value };
+  }));
   const removeManualMatch = id => setManualMatches(current => current.filter(match => match.id !== id));
 
   const togglePlayer = name => setSelectedPlayers(current => {
@@ -743,6 +750,9 @@ function TournamentParserPage() {
           <select aria-label={`Match ${index + 1} first player`} value={match.player1} onChange={event => updateManualMatch(match.id, 'player1', event.target.value)}>{standings.map(player => <option key={player.name} value={player.name}>{player.name}</option>)}</select>
           <select aria-label={`Match ${index + 1} result`} value={match.result} onChange={event => updateManualMatch(match.id, 'result', event.target.value)}><option value="player1">defeated</option><option value="player2">lost to</option><option value="draw">drew with</option><option value="bye">received a bye</option></select>
           {match.result !== 'bye' && <select aria-label={`Match ${index + 1} second player`} value={match.player2} onChange={event => updateManualMatch(match.id, 'player2', event.target.value)}>{standings.map(player => <option key={player.name} value={player.name}>{player.name}</option>)}</select>}
+          {(match.result === 'player1' || match.result === 'player2') && <select className="score-select" aria-label={`Match ${index + 1} game score`} value={match.score} onChange={event => updateManualMatch(match.id, 'score', event.target.value)}>
+            {(match.result === 'player1' ? ['2-0', '2-1', '1-0'] : ['0-2', '1-2', '0-1']).map(score => <option key={score} value={score}>{score.replace('-', ' – ')}</option>)}
+          </select>}
           <button type="button" className="remove-match-button" aria-label={`Remove match ${index + 1}`} onClick={() => removeManualMatch(match.id)}>Remove</button>
         </div>)}
       </div>
