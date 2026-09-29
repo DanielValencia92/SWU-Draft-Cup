@@ -51,6 +51,10 @@ body::before {
   --page-art: url('/swh08_keyart.jpg');
 }
 
+.page-homeworlds {
+  --page-art: url('/swh09_homeworlds_keyart.png');
+}
+
 .page-lawless {
   --page-art: url('/swh07_keyart.jpg');
 }

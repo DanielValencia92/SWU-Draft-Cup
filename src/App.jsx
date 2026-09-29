@@ -206,6 +206,10 @@ function StandingsPage({ currentSet, navigate }) {
   const rosterPending = currentSet.roster === 'TBD';
   const { rows, headers, loading, error } = useCsvData(currentSet.csvUrl, 30000, !rosterPending);
   const normalizedHeaders = useMemo(() => headers.map(normalizeHeader), [headers]);
+  const drafts = useMemo(
+    () => Array.from({ length: currentSet.maxDrafts || 4 }, (_, index) => index + 1),
+    [currentSet.maxDrafts]
+  );
 
   const sortedRows = useMemo(() => {
     if (!headers.length) {
@@ -215,29 +219,34 @@ function StandingsPage({ currentSet, navigate }) {
     const pointsIndex = normalizedHeaders.findIndex(header => header === 'points');
     const mmwrIndex = normalizedHeaders.findIndex(header => header === 'mmwr');
     const oppAvgMmwrIndex = normalizedHeaders.findIndex(header => header === 'oppavermmwr');
-    const sorted = [...rows];
+    const sorted = rows.map(row => ({
+      row,
+      calculatedPoints: currentSet.scoreBestDrafts
+        ? calculateBestDraftPoints(row, normalizedHeaders, drafts, currentSet.scoreBestDrafts)
+        : parseInt(row[pointsIndex] || 0, 10)
+    }));
 
     sorted.sort((a, b) => {
-      const pointsA = parseInt(a[pointsIndex] || 0, 10);
-      const pointsB = parseInt(b[pointsIndex] || 0, 10);
+      const pointsA = a.calculatedPoints;
+      const pointsB = b.calculatedPoints;
 
       if (pointsB !== pointsA || currentSet.standingsMode === 'points') {
         return pointsB - pointsA;
       }
 
-      const mmwrA = parseFloat(a[mmwrIndex] || 0);
-      const mmwrB = parseFloat(b[mmwrIndex] || 0);
+      const mmwrA = parseFloat(a.row[mmwrIndex] || 0);
+      const mmwrB = parseFloat(b.row[mmwrIndex] || 0);
       if (mmwrB !== mmwrA) {
         return mmwrB - mmwrA;
       }
 
-      const oppAvgA = parseFloat(a[oppAvgMmwrIndex] || 0);
-      const oppAvgB = parseFloat(b[oppAvgMmwrIndex] || 0);
+      const oppAvgA = parseFloat(a.row[oppAvgMmwrIndex] || 0);
+      const oppAvgB = parseFloat(b.row[oppAvgMmwrIndex] || 0);
       return oppAvgB - oppAvgA;
     });
 
     return sorted;
-  }, [currentSet.standingsMode, headers.length, normalizedHeaders, rows]);
+  }, [currentSet.scoreBestDrafts, currentSet.standingsMode, drafts, headers.length, normalizedHeaders, rows]);
 
   return (
     <>
@@ -268,15 +277,17 @@ function StandingsPage({ currentSet, navigate }) {
 
       <section className="surface table-scroll">
         <table id="standings">
-          <StandingsHead showTiebreakers={currentSet.standingsMode !== 'points'} />
+          <StandingsHead drafts={drafts} showTiebreakers={currentSet.standingsMode !== 'points'} />
           <tbody>
-            {sortedRows.map((row, index) => (
+            {sortedRows.map(({ row, calculatedPoints }, index) => (
               <StandingsRow
                 key={`${row[0] || 'row'}-${index}`}
                 row={row}
                 rank={index + 1}
                 normalizedHeaders={normalizedHeaders}
                 showTiebreakers={currentSet.standingsMode !== 'points'}
+                drafts={drafts}
+                calculatedPoints={calculatedPoints}
               />
             ))}
           </tbody>
@@ -286,13 +297,13 @@ function StandingsPage({ currentSet, navigate }) {
   );
 }
 
-function StandingsHead({ showTiebreakers }) {
+function StandingsHead({ drafts, showTiebreakers }) {
   return (
     <thead>
       <tr>
         <th rowSpan="2">Rank</th>
         <th rowSpan="2">Player</th>
-        {[1, 2, 3, 4].map(draft => (
+        {drafts.map(draft => (
           <th key={draft} colSpan="3" className="group-header">Draft {draft}</th>
         ))}
         <th rowSpan="2">Points</th>
@@ -304,7 +315,7 @@ function StandingsHead({ showTiebreakers }) {
         )}
       </tr>
       <tr>
-        {[1, 2, 3, 4].flatMap(draft => (
+        {drafts.flatMap(draft => (
           ['Wins', 'Losses', 'Draws'].map(label => (
             <th key={`${draft}-${label}`}>{label}</th>
           ))
@@ -314,36 +325,42 @@ function StandingsHead({ showTiebreakers }) {
   );
 }
 
-function StandingsRow({ row, rank, normalizedHeaders, showTiebreakers }) {
+function StandingsRow({ row, rank, normalizedHeaders, showTiebreakers, drafts, calculatedPoints }) {
   const pointsIndex = normalizedHeaders.findIndex(header => header === 'points');
   const mmwrIndex = normalizedHeaders.findIndex(header => header === 'mmwr');
   const oppAvgMmwrIndex = normalizedHeaders.findIndex(header => header === 'oppavermmwr');
-  const totalPoints = parseInt(row[pointsIndex] || 0, 10);
-  const cells = showTiebreakers ? row : row.filter((_, index) => index !== mmwrIndex && index !== oppAvgMmwrIndex);
+  const playerIndex = normalizedHeaders.findIndex(header => header === 'player');
+  const draftCells = drafts.flatMap(draft => ['wins', 'losses', 'draws'].map(stat => {
+    const index = normalizedHeaders.findIndex(header => header === `draft${draft}${stat}`);
+    return index === -1 ? '' : row[index];
+  }));
+  const cells = [
+    row[playerIndex === -1 ? 0 : playerIndex],
+    ...draftCells,
+    calculatedPoints,
+    ...(showTiebreakers ? [formatDecimal(row[mmwrIndex]), formatDecimal(row[oppAvgMmwrIndex])] : [])
+  ];
 
   return (
-    <tr className={totalPoints > 0 && rank <= 4 ? 'top4' : undefined}>
+    <tr className={calculatedPoints > 0 && rank <= 4 ? 'top4' : undefined}>
       <td>{rank}</td>
-      {cells.map((cell, index) => {
-        const sourceIndex = showTiebreakers ? index : remapPointsOnlyIndex(index, mmwrIndex, oppAvgMmwrIndex);
-        const formatted = sourceIndex === mmwrIndex || sourceIndex === oppAvgMmwrIndex
-          ? formatDecimal(cell)
-          : cell;
-        return <td key={index}>{formatted}</td>;
-      })}
+      {cells.map((cell, index) => <td key={index}>{cell}</td>)}
     </tr>
   );
 }
 
-function remapPointsOnlyIndex(index, mmwrIndex, oppAvgMmwrIndex) {
-  let sourceIndex = index;
-  if (mmwrIndex !== -1 && sourceIndex >= mmwrIndex) {
-    sourceIndex += 1;
-  }
-  if (oppAvgMmwrIndex !== -1 && sourceIndex >= oppAvgMmwrIndex) {
-    sourceIndex += 1;
-  }
-  return sourceIndex;
+function calculateBestDraftPoints(row, normalizedHeaders, drafts, scoreBestDrafts) {
+  const scores = drafts.map(draft => {
+    const indexFor = stat => normalizedHeaders.findIndex(header => header === `draft${draft}${stat}`);
+    const wins = parseInt(row[indexFor('wins')] || 0, 10);
+    const losses = parseInt(row[indexFor('losses')] || 0, 10);
+    const draws = parseInt(row[indexFor('draws')] || 0, 10);
+    const byes = parseInt(row[indexFor('byes')] || 0, 10);
+    const played = wins + losses + draws > 0;
+    const undefeatedBonus = wins === 3 && losses === 0 && draws === 0 && byes === 0;
+    return played ? wins * 3 + draws + (undefeatedBonus ? 1 : 0) : 0;
+  });
+  return scores.sort((a, b) => b - a).slice(0, scoreBestDrafts).reduce((total, score) => total + score, 0);
 }
 
 function formatDecimal(value) {
@@ -490,16 +507,17 @@ function RulesPage() {
         <h2>🌟 SWU Draft Cup — Format & Rules</h2>
 
         <h2>🧾 Overview</h2>
-        <p>The SWU Draft Cup is a multi-event draft league culminating in a final tournament. Players will compete in 3 or more draft pods and earn points based on match performance. After the draft phase is completed, a single-elimination finals top 8 tournament will determine the season champion.</p>
+        <p>The SWU Draft Cup is a multi-event draft league culminating in a final tournament. Players will compete in 3 or more draft pods and earn points based on match performance. After the draft phase is completed, a single-elimination finals Top 6 tournament will determine the season champion.</p>
 
         <h2>🌀 Draft Phase</h2>
         <h3>✳️ Participation Rules</h3>
         <ul>
           <li>Each player must participate in a minimum of 3 drafts.</li>
-          <li>You may play up to three extra drafts if you would like more chances of a better draft deck.</li>
+          <li>You may play up to two extra drafts, for a maximum of five total drafts.</li>
           <li>Draft pods do not need to consist exclusively of Draft Cup members.</li>
           <li>Each pod must include at least two other Draft Cup members.</li>
           <li>Each pod must have a minimum of 6 players.</li>
+          <li><strong>Competitive-tier PQ+ exception:</strong> A member may report a placement-based draft from a competitive-tier Planetary Qualifier or higher event even if no other Draft Cup members participated in that pod.</li>
           <li>You must track and preserve your drafted card pool separately for each draft, including sideboards.</li>
           <li>Please post pictures of your draft pools in the current season's forum thread to document them.</li>
           <li>You must report your draft using the forum posts before you begin the draft.</li>
@@ -511,13 +529,6 @@ function RulesPage() {
           <li>You have until the end of the day to post the melee link and pictures of your drafted pool to your forum thread. Please see the discord server for more information.</li>
         </ul>
 
-        <h3>Pod Types</h3>
-        <p>When you report a draft pod, you must declare if it is for:</p>
-        <ul>
-          <li><strong>Points + Pool</strong> if you want it to count towards one of your 6 max decks and have it be scored for standings.</li>
-          <li><strong>Pool Only</strong> if you want it to count towards one of your 6 max drafts but not have it be scored for standings.</li>
-        </ul>
-
         <h2>🏅 Match Scoring (Draft Phase)</h2>
         <ul>
           <li>3 points per match win or match bye.</li>
@@ -525,12 +536,13 @@ function RulesPage() {
           <li>+1 bonus point for going 3-0 in a draft.</li>
           <li>The +1 bonus point is only awarded for winning 3 matches; a 3-0 with a bye will not award the bonus point.</li>
           <li>These points contribute to your ladder standings and will be used for seeding in the finals.</li>
-          <li>Only the first four Point Pods you report will count for the standings.</li>
+          <li>Your best four drafts will count for the standings, from up to five reported drafts.</li>
           <li>A draft must be played in best-of-three format for it to qualify.</li>
         </ul>
 
-        <h2>🏆 Final Tournament (Top 8)</h2>
-        <p>The Draft Cup has a cut to Top 8. Ties are resolved by comparing player's member match win rate (MMWR), and further ties are resolved by opponents average MMWR.</p>
+        <h2>🏆 Final Tournament (Top 6)</h2>
+        <p>The Draft Cup has a cut to Top 6. Ties are resolved by opponents' match-win percentage (OMW), then player game-win percentage (TGW).</p>
+        <p>Seeds 1 and 2 receive first-round byes. In the opening round, Seed 3 plays Seed 6 and Seed 4 plays Seed 5. Seed 1 then plays the winner of the 3/6 match, while Seed 2 plays the winner of the 4/5 match.</p>
         <p>For detailed information on the format of the final tournament, please see top-cut-format.</p>
 
         <h2>Top Cut Format - Draft 'Trilogy'</h2>
@@ -540,6 +552,7 @@ function RulesPage() {
           <li>Each deck must also include its associated draft pool/sideboard, which may only be used with that deck.</li>
           <li>Your three decks are locked for the duration of top cut.</li>
           <li>Cards cannot be shared between decks; sideboard A can only be used for deck A.</li>
+          <li>All reported pools remain eligible for top cut deck selection, including a fifth draft that does not count among your four best scoring drafts.</li>
         </ul>
 
         <h3>Match Structure</h3>
@@ -592,6 +605,7 @@ function TournamentParserPage() {
   const [rounds, setRounds] = useState([]);
   const [selectedRound, setSelectedRound] = useState('');
   const [standings, setStandings] = useState([]);
+  const [matches, setMatches] = useState([]);
   const [selectedPlayers, setSelectedPlayers] = useState(new Set());
   const [manualMatches, setManualMatches] = useState([]);
   const [fallbackNotice, setFallbackNotice] = useState('');
@@ -607,7 +621,18 @@ function TournamentParserPage() {
     const players = payload.data.map(standing => {
       const player = standing.Team?.Players?.[0];
       const name = player?.DisplayName || player?.Username;
-      return name ? { name, wins: standing.MatchWins || 0, losses: standing.MatchLosses || 0, draws: standing.MatchDraws || 0, byes: standing.MatchByes || standing.Byes || 0 } : null;
+      return name ? {
+        name,
+        wins: standing.MatchWins || 0,
+        losses: standing.MatchLosses || 0,
+        draws: standing.MatchDraws || 0,
+        byes: standing.MatchByes || standing.Byes || 0,
+        matchCount: standing.MatchCount || 0,
+        gameWins: standing.GameWins || 0,
+        gameLosses: standing.GameLosses || 0,
+        gameDraws: standing.GameDraws || 0,
+        gameCount: standing.GameCount || 0
+      } : null;
     }).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
     if (!players.length) throw new Error('No players were found in the selected round standings.');
     setRounds(payload.rounds || []);
@@ -616,6 +641,7 @@ function TournamentParserPage() {
       ? `The latest round has no standings, so Round ${payload.selectedRound} was loaded automatically.`
       : '');
     setStandings(players);
+    setMatches(payload.matches || []);
     setSelectedPlayers(new Set(players.map(player => player.name)));
     setManualMatches([]);
     setResults([]);
@@ -631,6 +657,7 @@ function TournamentParserPage() {
     setLoading(true);
     setError('');
     setStandings([]);
+    setMatches([]);
     setResults([]);
     try {
       setTournamentId(id);
@@ -665,7 +692,7 @@ function TournamentParserPage() {
   const updateManualMatch = (id, field, value) => setManualMatches(current => current.map(match => {
     if (match.id !== id) return match;
     if (field === 'result') {
-      const defaultScores = { player1: '2-0', player2: '0-2', draw: '', bye: '' };
+      const defaultScores = { player1: '2-0', player2: '0-2', draw: '0-0-1', bye: '' };
       return { ...match, result: value, score: defaultScores[value] };
     }
     return { ...match, [field]: value };
@@ -685,6 +712,19 @@ function TournamentParserPage() {
       return;
     }
     const workingStandings = standings.map(player => ({ ...player }));
+    const opponents = new Map(workingStandings.map(player => [player.name, []]));
+    matches.forEach(match => {
+      if (!match.HasResult) return;
+      const competitors = (match.Competitors || [])
+        .map(competitor => competitor.Team?.Players?.[0])
+        .filter(Boolean)
+        .map(player => player.DisplayName || player.Username)
+        .filter(Boolean);
+      if (competitors.length !== 2) return;
+      const [first, second] = competitors;
+      opponents.get(first)?.push(second);
+      opponents.get(second)?.push(first);
+    });
     for (const match of manualMatches) {
       const player1 = workingStandings.find(player => player.name === match.player1);
       const player2 = workingStandings.find(player => player.name === match.player2);
@@ -697,19 +737,39 @@ function TournamentParserPage() {
       if (match.result === 'player2') { player2.wins += 1; player1.losses += 1; }
       if (match.result === 'draw') { player1.draws += 1; player2.draws += 1; }
       if (match.result === 'bye') { player1.wins += 1; player1.byes += 1; }
+      if (match.result !== 'bye') {
+        player1.matchCount += 1;
+        player2.matchCount += 1;
+        opponents.get(player1.name)?.push(player2.name);
+        opponents.get(player2.name)?.push(player1.name);
+        const [player1Games = 0, player2Games = 0, drawnGames = 0] = match.score.split('-').map(Number);
+        player1.gameWins += player1Games;
+        player1.gameLosses += player2Games;
+        player1.gameDraws += drawnGames;
+        player1.gameCount += player1Games + player2Games + drawnGames;
+        player2.gameWins += player2Games;
+        player2.gameLosses += player1Games;
+        player2.gameDraws += drawnGames;
+        player2.gameCount += player1Games + player2Games + drawnGames;
+      }
     }
-    const included = workingStandings.filter(player => selectedPlayers.has(player.name));
-    const withMmwr = included.map(player => {
-      const totalMatches = player.wins + player.losses + player.draws;
-      return { ...player, mmwr: totalMatches ? (player.wins + 0.5 * player.draws) / totalMatches : 0 };
-    });
-    const calculated = withMmwr.map(player => {
-      const opponents = withMmwr.filter(other => other.name !== player.name);
-      const oppAvgMmwr = opponents.length ? opponents.reduce((total, opponent) => total + opponent.mmwr, 0) / opponents.length : 0.5;
-      const undefeatedBonus = player.losses === 0 && player.wins === 3 && player.byes === 0;
-      return { ...player, oppAvgMmwr, undefeatedBonus, points: player.wins * 3 + player.draws + (undefeatedBonus ? 1 : 0) };
-    });
-    calculated.sort((a, b) => b.points - a.points || b.mmwr - a.mmwr || b.oppAvgMmwr - a.oppAvgMmwr);
+    const withMatchWinPercentage = workingStandings.map(player => ({
+      ...player,
+      matchWinPercentage: Math.max(1 / 3, player.matchCount ? player.wins / player.matchCount : 0)
+    }));
+    const playerByName = new Map(withMatchWinPercentage.map(player => [player.name, player]));
+    const calculated = withMatchWinPercentage
+      .filter(player => selectedPlayers.has(player.name))
+      .map(player => {
+        const opponentNames = opponents.get(player.name) || [];
+        const opponentMatchWinPercentage = opponentNames.length
+          ? opponentNames.reduce((total, opponentName) => total + (playerByName.get(opponentName)?.matchWinPercentage || 1 / 3), 0) / opponentNames.length
+          : 1 / 3;
+        const teamGameWinPercentage = Math.max(1 / 3, player.gameCount ? (player.gameWins * 3 + player.gameDraws) / (player.gameCount * 3) : 0);
+        const undefeatedBonus = player.losses === 0 && player.wins === 3 && player.byes === 0;
+        return { ...player, opponentMatchWinPercentage, teamGameWinPercentage, undefeatedBonus, points: player.wins * 3 + player.draws + (undefeatedBonus ? 1 : 0) };
+      });
+    calculated.sort((a, b) => b.points - a.points || b.opponentMatchWinPercentage - a.opponentMatchWinPercentage || b.teamGameWinPercentage - a.teamGameWinPercentage);
     setError('');
     setResults(calculated);
   };
@@ -751,8 +811,8 @@ function TournamentParserPage() {
           <select aria-label={`Match ${index + 1} first player`} value={match.player1} onChange={event => updateManualMatch(match.id, 'player1', event.target.value)}>{standings.map(player => <option key={player.name} value={player.name}>{player.name}</option>)}</select>
           <select aria-label={`Match ${index + 1} result`} value={match.result} onChange={event => updateManualMatch(match.id, 'result', event.target.value)}><option value="player1">defeated</option><option value="player2">lost to</option><option value="draw">drew with</option><option value="bye">received a bye</option></select>
           {match.result !== 'bye' && <select aria-label={`Match ${index + 1} second player`} value={match.player2} onChange={event => updateManualMatch(match.id, 'player2', event.target.value)}>{standings.map(player => <option key={player.name} value={player.name}>{player.name}</option>)}</select>}
-          {(match.result === 'player1' || match.result === 'player2') && <select className="score-select" aria-label={`Match ${index + 1} game score`} value={match.score} onChange={event => updateManualMatch(match.id, 'score', event.target.value)}>
-            {(match.result === 'player1' ? ['2-0', '2-1', '1-0'] : ['0-2', '1-2', '0-1']).map(score => <option key={score} value={score}>{score.replace('-', ' – ')}</option>)}
+          {match.result !== 'bye' && <select className="score-select" aria-label={`Match ${index + 1} game score`} value={match.score} onChange={event => updateManualMatch(match.id, 'score', event.target.value)}>
+            {(match.result === 'player1' ? ['2-0', '2-1', '1-0'] : match.result === 'player2' ? ['0-2', '1-2', '0-1'] : ['0-0-1', '1-1-1']).map(score => <option key={score} value={score}>{score.replaceAll('-', ' – ')}</option>)}
           </select>}
           <button type="button" className="remove-match-button" aria-label={`Remove match ${index + 1}`} onClick={() => removeManualMatch(match.id)}>Remove</button>
         </div>)}
@@ -760,7 +820,7 @@ function TournamentParserPage() {
     </section>}
     {results.length > 0 && <section className="parser-results">
       <div className="stats-summary">{[['Players', results.length], ['Total Wins', totals.wins], ['Total Losses', totals.losses], ['Total Draws', totals.draws], ['Total Points', totals.points]].map(([label, value]) => <div className="surface stat-card" key={label}><strong>{value}</strong><span>{label}</span></div>)}</div>
-      <div className="surface table-scroll"><table className="parser-table"><thead><tr><th>Player</th><th>Wins</th><th>Losses</th><th>Draws</th><th>MMWR</th><th>Opp. Avg MMWR</th><th>Points</th></tr></thead><tbody>{results.map(player => <tr key={player.name}><td>{player.name}</td><td>{player.wins}</td><td>{player.losses}</td><td>{player.draws}</td><td>{player.mmwr.toFixed(3)}</td><td>{player.oppAvgMmwr.toFixed(3)}</td><td><strong>{player.points}</strong>{player.undefeatedBonus ? ' 🏆' : ''}</td></tr>)}</tbody></table></div>
+      <div className="surface table-scroll"><table className="parser-table"><thead><tr><th>Player</th><th>Wins</th><th>Losses</th><th>Draws</th><th>OMW</th><th>TGW</th><th>Points</th></tr></thead><tbody>{results.map(player => <tr key={player.name}><td>{player.name}</td><td>{player.wins}</td><td>{player.losses}</td><td>{player.draws}</td><td>{player.opponentMatchWinPercentage.toFixed(3)}</td><td>{player.teamGameWinPercentage.toFixed(3)}</td><td><strong>{player.points}</strong>{player.undefeatedBonus ? ' 🏆' : ''}</td></tr>)}</tbody></table></div>
     </section>}
   </>;
 }
