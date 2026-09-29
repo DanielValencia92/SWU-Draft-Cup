@@ -86,7 +86,7 @@ Field guide:
 - `pageClass`: CSS class that controls the background image.
 - `csvUrl`: published Google Sheets CSV URL.
 - `roster`: use `'TBD'` when the roster/CSV is not ready, or `'csv'` when standings should fetch from the sheet.
-- `standingsMode`: use `'tiebreakers'` for Points, MMWR, and Opp. Aver. MMWR sorting. Use `'points'` for older seasons that sort by points only.
+- `standingsMode`: use `'tiebreakers'` for Points, MMWR, Opp. Aver. MMWR, and reported-pod sorting. Use `'points'` for older seasons that sort by points only.
 
 If the season does not have a roster yet, keep:
 
@@ -143,7 +143,7 @@ Opp. Aver. MMWR
 
 For seasons configured with `scoreBestDrafts`, the site calculates Points from the draft records and counts only the best four results. The spreadsheet's `Points` column is not used for that calculation. Add an optional `Draft N Byes` column when a draft includes a bye; this prevents a 3–0 record containing a bye from receiving the undefeated bonus point.
 
-Homeworlds uses Melee's first two tiebreakers instead: `Opponent Match Win Percentage` (OMW) and `Team Game Win Percentage` (TGW).
+Homeworlds uses Melee's first two tiebreakers instead: `Opponent Match Win Percentage` (OMW) and `Team Game Win Percentage` (TGW). Its third tiebreaker is the number of reported draft pods, calculated from the player’s draft results (including bye-only results).
 
 Champion history is configured with `championsCsvUrl` in `src/config.js`.
 

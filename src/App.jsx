@@ -214,7 +214,8 @@ function StandingsPage({ currentSet, navigate }) {
     ? []
     : currentSet.tiebreakers || [
       { header: 'mmwr', label: 'MMWR' },
-      { header: 'oppavermmwr', label: 'Opp. Aver. MMWR' }
+      { header: 'oppavermmwr', label: 'Opp. Aver. MMWR' },
+      { value: 'reportedPods', label: 'Reported Pods' }
     ];
 
   const sortedRows = useMemo(() => {
@@ -223,12 +224,12 @@ function StandingsPage({ currentSet, navigate }) {
     }
 
     const pointsIndex = normalizedHeaders.findIndex(header => header === 'points');
-    const tiebreakerIndexes = tiebreakers.map(tiebreaker => normalizedHeaders.findIndex(header => header === tiebreaker.header));
     const sorted = rows.map(row => ({
       row,
       calculatedPoints: currentSet.scoreBestDrafts
         ? calculateBestDraftPoints(row, normalizedHeaders, drafts, currentSet.scoreBestDrafts)
-        : parseInt(row[pointsIndex] || 0, 10)
+        : parseInt(row[pointsIndex] || 0, 10),
+      reportedPods: countReportedPods(row, normalizedHeaders, drafts)
     }));
 
     sorted.sort((a, b) => {
@@ -239,9 +240,10 @@ function StandingsPage({ currentSet, navigate }) {
         return pointsB - pointsA;
       }
 
-      for (const tiebreakerIndex of tiebreakerIndexes) {
-        const valueA = parseFloat(a.row[tiebreakerIndex] || 0);
-        const valueB = parseFloat(b.row[tiebreakerIndex] || 0);
+      for (const tiebreaker of tiebreakers) {
+        const tiebreakerIndex = normalizedHeaders.findIndex(header => header === tiebreaker.header);
+        const valueA = tiebreaker.value === 'reportedPods' ? a.reportedPods : parseFloat(a.row[tiebreakerIndex] || 0);
+        const valueB = tiebreaker.value === 'reportedPods' ? b.reportedPods : parseFloat(b.row[tiebreakerIndex] || 0);
         if (valueB !== valueA) return valueB - valueA;
       }
       return 0;
@@ -281,7 +283,7 @@ function StandingsPage({ currentSet, navigate }) {
         <table id="standings">
           <StandingsHead drafts={drafts} tiebreakers={tiebreakers} />
           <tbody>
-            {sortedRows.map(({ row, calculatedPoints }, index) => (
+            {sortedRows.map(({ row, calculatedPoints, reportedPods }, index) => (
               <StandingsRow
                 key={`${row[0] || 'row'}-${index}`}
                 row={row}
@@ -289,6 +291,7 @@ function StandingsPage({ currentSet, navigate }) {
                 normalizedHeaders={normalizedHeaders}
                 drafts={drafts}
                 calculatedPoints={calculatedPoints}
+                reportedPods={reportedPods}
                 tiebreakers={tiebreakers}
               />
             ))}
@@ -322,7 +325,7 @@ function StandingsHead({ drafts, tiebreakers }) {
   );
 }
 
-function StandingsRow({ row, rank, normalizedHeaders, drafts, calculatedPoints, tiebreakers }) {
+function StandingsRow({ row, rank, normalizedHeaders, drafts, calculatedPoints, reportedPods, tiebreakers }) {
   const playerIndex = normalizedHeaders.findIndex(header => header === 'player');
   const draftCells = drafts.flatMap(draft => ['wins', 'losses', 'draws'].map(stat => {
     const index = normalizedHeaders.findIndex(header => header === `draft${draft}${stat}`);
@@ -332,7 +335,11 @@ function StandingsRow({ row, rank, normalizedHeaders, drafts, calculatedPoints, 
     row[playerIndex === -1 ? 0 : playerIndex],
     ...draftCells,
     calculatedPoints,
-    ...tiebreakers.map(tiebreaker => formatDecimal(row[normalizedHeaders.findIndex(header => header === tiebreaker.header)]))
+    ...tiebreakers.map(tiebreaker => (
+      tiebreaker.value === 'reportedPods'
+        ? reportedPods
+        : formatDecimal(row[normalizedHeaders.findIndex(header => header === tiebreaker.header)])
+    ))
   ];
 
   return (
@@ -355,6 +362,17 @@ function calculateBestDraftPoints(row, normalizedHeaders, drafts, scoreBestDraft
     return played ? wins * 3 + draws + (undefeatedBonus ? 1 : 0) : 0;
   });
   return scores.sort((a, b) => b - a).slice(0, scoreBestDrafts).reduce((total, score) => total + score, 0);
+}
+
+function countReportedPods(row, normalizedHeaders, drafts) {
+  return drafts.reduce((total, draft) => {
+    const stats = ['wins', 'losses', 'draws', 'byes'];
+    const hasReportedResult = stats.some(stat => {
+      const index = normalizedHeaders.findIndex(header => header === `draft${draft}${stat}`);
+      return index !== -1 && parseInt(row[index] || 0, 10) > 0;
+    });
+    return total + (hasReportedResult ? 1 : 0);
+  }, 0);
 }
 
 function formatDecimal(value) {
@@ -535,7 +553,7 @@ function RulesPage() {
         </ul>
 
         <h2>🏆 Final Tournament (Top 6)</h2>
-        <p>The Draft Cup has a cut to Top 6. Ties are resolved by opponents' match-win percentage (OMW), then player game-win percentage (TGW).</p>
+        <p>The Draft Cup has a cut to Top 6. Ties are resolved by opponents' match-win percentage (OMW), then player game-win percentage (TGW), then the number of reported draft pods. A player who has participated in more reported pods receives the higher seed if the first two tiebreakers are still tied.</p>
         <p>Seeds 1 and 2 receive first-round byes. In the opening round, Seed 3 plays Seed 6 and Seed 4 plays Seed 5. Seed 1 then plays the winner of the 3/6 match, while Seed 2 plays the winner of the 4/5 match.</p>
         <p>For detailed information on the format of the final tournament, please see top-cut-format.</p>
 

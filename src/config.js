@@ -24,7 +24,8 @@ export const sets = [
     scoreBestDrafts: 4,
     tiebreakers: [
       { header: 'opponentmatchwinpercentage', label: 'OMW' },
-      { header: 'teamgamewinpercentage', label: 'TGW' }
+      { header: 'teamgamewinpercentage', label: 'TGW' },
+      { value: 'reportedPods', label: 'Reported Pods' }
     ]
   },
   {
