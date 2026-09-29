@@ -21,7 +21,11 @@ export const sets = [
     roster: 'TBD',
     standingsMode: 'tiebreakers',
     maxDrafts: 5,
-    scoreBestDrafts: 4
+    scoreBestDrafts: 4,
+    tiebreakers: [
+      { header: 'opponentmatchwinpercentage', label: 'OMW' },
+      { header: 'teamgamewinpercentage', label: 'TGW' }
+    ]
   },
   {
     slug: 'a-lawless-time',

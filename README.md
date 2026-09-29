@@ -143,6 +143,8 @@ Opp. Aver. MMWR
 
 For seasons configured with `scoreBestDrafts`, the site calculates Points from the draft records and counts only the best four results. The spreadsheet's `Points` column is not used for that calculation. Add an optional `Draft N Byes` column when a draft includes a bye; this prevents a 3–0 record containing a bye from receiving the undefeated bonus point.
 
+Homeworlds uses Melee's first two tiebreakers instead: `Opponent Match Win Percentage` (OMW) and `Team Game Win Percentage` (TGW).
+
 Champion history is configured with `championsCsvUrl` in `src/config.js`.
 
 The champions CSV supports these columns:

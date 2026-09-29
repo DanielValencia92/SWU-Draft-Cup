@@ -210,6 +210,12 @@ function StandingsPage({ currentSet, navigate }) {
     () => Array.from({ length: currentSet.maxDrafts || 4 }, (_, index) => index + 1),
     [currentSet.maxDrafts]
   );
+  const tiebreakers = currentSet.standingsMode === 'points'
+    ? []
+    : currentSet.tiebreakers || [
+      { header: 'mmwr', label: 'MMWR' },
+      { header: 'oppavermmwr', label: 'Opp. Aver. MMWR' }
+    ];
 
   const sortedRows = useMemo(() => {
     if (!headers.length) {
@@ -217,8 +223,7 @@ function StandingsPage({ currentSet, navigate }) {
     }
 
     const pointsIndex = normalizedHeaders.findIndex(header => header === 'points');
-    const mmwrIndex = normalizedHeaders.findIndex(header => header === 'mmwr');
-    const oppAvgMmwrIndex = normalizedHeaders.findIndex(header => header === 'oppavermmwr');
+    const tiebreakerIndexes = tiebreakers.map(tiebreaker => normalizedHeaders.findIndex(header => header === tiebreaker.header));
     const sorted = rows.map(row => ({
       row,
       calculatedPoints: currentSet.scoreBestDrafts
@@ -234,19 +239,16 @@ function StandingsPage({ currentSet, navigate }) {
         return pointsB - pointsA;
       }
 
-      const mmwrA = parseFloat(a.row[mmwrIndex] || 0);
-      const mmwrB = parseFloat(b.row[mmwrIndex] || 0);
-      if (mmwrB !== mmwrA) {
-        return mmwrB - mmwrA;
+      for (const tiebreakerIndex of tiebreakerIndexes) {
+        const valueA = parseFloat(a.row[tiebreakerIndex] || 0);
+        const valueB = parseFloat(b.row[tiebreakerIndex] || 0);
+        if (valueB !== valueA) return valueB - valueA;
       }
-
-      const oppAvgA = parseFloat(a.row[oppAvgMmwrIndex] || 0);
-      const oppAvgB = parseFloat(b.row[oppAvgMmwrIndex] || 0);
-      return oppAvgB - oppAvgA;
+      return 0;
     });
 
     return sorted;
-  }, [currentSet.scoreBestDrafts, currentSet.standingsMode, drafts, headers.length, normalizedHeaders, rows]);
+  }, [currentSet.scoreBestDrafts, currentSet.standingsMode, drafts, headers.length, normalizedHeaders, rows, tiebreakers]);
 
   return (
     <>
@@ -277,7 +279,7 @@ function StandingsPage({ currentSet, navigate }) {
 
       <section className="surface table-scroll">
         <table id="standings">
-          <StandingsHead drafts={drafts} showTiebreakers={currentSet.standingsMode !== 'points'} />
+          <StandingsHead drafts={drafts} tiebreakers={tiebreakers} />
           <tbody>
             {sortedRows.map(({ row, calculatedPoints }, index) => (
               <StandingsRow
@@ -285,9 +287,9 @@ function StandingsPage({ currentSet, navigate }) {
                 row={row}
                 rank={index + 1}
                 normalizedHeaders={normalizedHeaders}
-                showTiebreakers={currentSet.standingsMode !== 'points'}
                 drafts={drafts}
                 calculatedPoints={calculatedPoints}
+                tiebreakers={tiebreakers}
               />
             ))}
           </tbody>
@@ -297,7 +299,7 @@ function StandingsPage({ currentSet, navigate }) {
   );
 }
 
-function StandingsHead({ drafts, showTiebreakers }) {
+function StandingsHead({ drafts, tiebreakers }) {
   return (
     <thead>
       <tr>
@@ -307,12 +309,7 @@ function StandingsHead({ drafts, showTiebreakers }) {
           <th key={draft} colSpan="3" className="group-header">Draft {draft}</th>
         ))}
         <th rowSpan="2">Points</th>
-        {showTiebreakers && (
-          <>
-            <th rowSpan="2">MMWR</th>
-            <th rowSpan="2">Opp. Aver. MMWR</th>
-          </>
-        )}
+        {tiebreakers.map(tiebreaker => <th key={tiebreaker.header} rowSpan="2">{tiebreaker.label}</th>)}
       </tr>
       <tr>
         {drafts.flatMap(draft => (
@@ -325,10 +322,7 @@ function StandingsHead({ drafts, showTiebreakers }) {
   );
 }
 
-function StandingsRow({ row, rank, normalizedHeaders, showTiebreakers, drafts, calculatedPoints }) {
-  const pointsIndex = normalizedHeaders.findIndex(header => header === 'points');
-  const mmwrIndex = normalizedHeaders.findIndex(header => header === 'mmwr');
-  const oppAvgMmwrIndex = normalizedHeaders.findIndex(header => header === 'oppavermmwr');
+function StandingsRow({ row, rank, normalizedHeaders, drafts, calculatedPoints, tiebreakers }) {
   const playerIndex = normalizedHeaders.findIndex(header => header === 'player');
   const draftCells = drafts.flatMap(draft => ['wins', 'losses', 'draws'].map(stat => {
     const index = normalizedHeaders.findIndex(header => header === `draft${draft}${stat}`);
@@ -338,7 +332,7 @@ function StandingsRow({ row, rank, normalizedHeaders, showTiebreakers, drafts, c
     row[playerIndex === -1 ? 0 : playerIndex],
     ...draftCells,
     calculatedPoints,
-    ...(showTiebreakers ? [formatDecimal(row[mmwrIndex]), formatDecimal(row[oppAvgMmwrIndex])] : [])
+    ...tiebreakers.map(tiebreaker => formatDecimal(row[normalizedHeaders.findIndex(header => header === tiebreaker.header)]))
   ];
 
   return (
