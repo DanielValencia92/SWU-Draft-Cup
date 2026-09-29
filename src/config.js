@@ -7,7 +7,21 @@ export const sets = [
     pageClass: 'page-ashes',
     csvUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ00F_tYNwL63C2CjGX__uxtcVmDUZTf4HNTrJbz2lNTW86rT5ORKY82JhZyqvlNpR7o-DNWIzHNyTT/pub?gid=0&single=true&output=csv',
     roster: 'csv',
-    standingsMode: 'tiebreakers'
+    standingsMode: 'tiebreakers',
+    maxDrafts: 5,
+    scoreBestDrafts: 4
+  },
+  {
+    slug: 'homeworlds',
+    legacyPath: '/season09.html',
+    name: 'Homeworlds',
+    eyebrow: 'Upcoming Season',
+    pageClass: 'page-homeworlds',
+    csvUrl: '',
+    roster: 'TBD',
+    standingsMode: 'tiebreakers',
+    maxDrafts: 5,
+    scoreBestDrafts: 4
   },
   {
     slug: 'a-lawless-time',
