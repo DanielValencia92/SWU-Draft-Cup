@@ -9,7 +9,7 @@ export const sets = [
     roster: 'csv',
     standingsMode: 'tiebreakers',
     maxDrafts: 5,
-    scoreBestDrafts: 4
+    countedDrafts: 4
   },
   {
     slug: 'homeworlds',
@@ -21,11 +21,11 @@ export const sets = [
     roster: 'TBD',
     standingsMode: 'tiebreakers',
     maxDrafts: 5,
-    scoreBestDrafts: 4,
+    countedDrafts: 4,
     tiebreakers: [
-      { header: 'opponentmatchwinpercentage', label: 'OMW' },
-      { header: 'teamgamewinpercentage', label: 'TGW' },
-      { value: 'reportedPods', label: 'Reported Pods' }
+      { header: 'omw', label: 'OMW' },
+      { header: 'tgw', label: 'TGW' },
+      { header: 'reportedpods', label: 'Reported Pods' }
     ]
   },
   {

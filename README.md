@@ -86,7 +86,8 @@ Field guide:
 - `pageClass`: CSS class that controls the background image.
 - `csvUrl`: published Google Sheets CSV URL.
 - `roster`: use `'TBD'` when the roster/CSV is not ready, or `'csv'` when standings should fetch from the sheet.
-- `standingsMode`: use `'tiebreakers'` for Points, MMWR, Opp. Aver. MMWR, and reported-pod sorting. Use `'points'` for older seasons that sort by points only.
+- `standingsMode`: use `'tiebreakers'` for points plus configured tiebreakers. Use `'points'` for older seasons that sort by points only.
+- `countedDrafts`: optional number of a player's best draft results to mark with a subtle gold outline. This is visual-only; the spreadsheet remains the source of truth for total points.
 
 If the season does not have a roster yet, keep:
 
@@ -141,9 +142,9 @@ MMWR
 Opp. Aver. MMWR
 ```
 
-For seasons configured with `scoreBestDrafts`, the site calculates Points from the draft records and counts only the best four results. The spreadsheet's `Points` column is not used for that calculation. Add an optional `Draft N Byes` column when a draft includes a bye; this prevents a 3–0 record containing a bye from receiving the undefeated bonus point.
+The spreadsheet's `Points` column is the source of truth for standings and sorting. For a season with `countedDrafts`, the site only uses the individual draft records to add a visual outline around the best results; it does not calculate or replace the spreadsheet total. Add an optional `Draft N Byes` column when a draft includes a bye so a 3–0 result with a bye is not marked as an undefeated-bonus result.
 
-Homeworlds uses Melee's first two tiebreakers instead: `Opponent Match Win Percentage` (OMW) and `Team Game Win Percentage` (TGW). Its third tiebreaker is the number of reported draft pods, calculated from the player’s draft results (including bye-only results).
+Homeworlds uses the sheet columns `OMW`, `TGW`, and `Reported Pods` as its tiebreakers, in that order.
 
 Champion history is configured with `championsCsvUrl` in `src/config.js`.
 

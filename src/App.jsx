@@ -226,15 +226,13 @@ function StandingsPage({ currentSet, navigate }) {
     const pointsIndex = normalizedHeaders.findIndex(header => header === 'points');
     const sorted = rows.map(row => ({
       row,
-      calculatedPoints: currentSet.scoreBestDrafts
-        ? calculateBestDraftPoints(row, normalizedHeaders, drafts, currentSet.scoreBestDrafts)
-        : parseInt(row[pointsIndex] || 0, 10),
+      points: parseInt(row[pointsIndex] || 0, 10),
       reportedPods: countReportedPods(row, normalizedHeaders, drafts)
     }));
 
     sorted.sort((a, b) => {
-      const pointsA = a.calculatedPoints;
-      const pointsB = b.calculatedPoints;
+      const pointsA = a.points;
+      const pointsB = b.points;
 
       if (pointsB !== pointsA || currentSet.standingsMode === 'points') {
         return pointsB - pointsA;
@@ -250,7 +248,7 @@ function StandingsPage({ currentSet, navigate }) {
     });
 
     return sorted;
-  }, [currentSet.scoreBestDrafts, currentSet.standingsMode, drafts, headers.length, normalizedHeaders, rows, tiebreakers]);
+  }, [currentSet.standingsMode, drafts, headers.length, normalizedHeaders, rows, tiebreakers]);
 
   return (
     <>
@@ -273,6 +271,11 @@ function StandingsPage({ currentSet, navigate }) {
             ))}
           </select>
         </div>
+        {currentSet.countedDrafts && (
+          <p className="counted-draft-legend">
+            Gold outlines mark the {currentSet.countedDrafts} draft results counted in the sheet total.
+          </p>
+        )}
       </section>
 
       {rosterPending && <p className="status">Roster TBD. Standings will appear here once the season roster is ready.</p>}
@@ -283,16 +286,17 @@ function StandingsPage({ currentSet, navigate }) {
         <table id="standings">
           <StandingsHead drafts={drafts} tiebreakers={tiebreakers} />
           <tbody>
-            {sortedRows.map(({ row, calculatedPoints, reportedPods }, index) => (
+            {sortedRows.map(({ row, points, reportedPods }, index) => (
               <StandingsRow
                 key={`${row[0] || 'row'}-${index}`}
                 row={row}
                 rank={index + 1}
                 normalizedHeaders={normalizedHeaders}
                 drafts={drafts}
-                calculatedPoints={calculatedPoints}
+                points={points}
                 reportedPods={reportedPods}
                 tiebreakers={tiebreakers}
+                countedDrafts={currentSet.countedDrafts}
               />
             ))}
           </tbody>
@@ -325,33 +329,47 @@ function StandingsHead({ drafts, tiebreakers }) {
   );
 }
 
-function StandingsRow({ row, rank, normalizedHeaders, drafts, calculatedPoints, reportedPods, tiebreakers }) {
+function StandingsRow({ row, rank, normalizedHeaders, drafts, points, reportedPods, tiebreakers, countedDrafts }) {
   const playerIndex = normalizedHeaders.findIndex(header => header === 'player');
-  const draftCells = drafts.flatMap(draft => ['wins', 'losses', 'draws'].map(stat => {
-    const index = normalizedHeaders.findIndex(header => header === `draft${draft}${stat}`);
-    return index === -1 ? '' : row[index];
-  }));
-  const cells = [
-    row[playerIndex === -1 ? 0 : playerIndex],
-    ...draftCells,
-    calculatedPoints,
-    ...tiebreakers.map(tiebreaker => (
-      tiebreaker.value === 'reportedPods'
-        ? reportedPods
-        : formatDecimal(row[normalizedHeaders.findIndex(header => header === tiebreaker.header)])
-    ))
-  ];
+  const countedDraftNumbers = getCountedDraftNumbers(row, normalizedHeaders, drafts, countedDrafts);
 
   return (
-    <tr className={calculatedPoints > 0 && rank <= 4 ? 'top4' : undefined}>
+    <tr>
       <td>{rank}</td>
-      {cells.map((cell, index) => <td key={index}>{cell}</td>)}
+      <td>{row[playerIndex === -1 ? 0 : playerIndex]}</td>
+      {drafts.flatMap(draft => ['wins', 'losses', 'draws'].map((stat, statIndex) => {
+        const index = normalizedHeaders.findIndex(header => header === `draft${draft}${stat}`);
+        const isCounted = countedDraftNumbers.has(draft);
+        const groupPosition = statIndex === 0 ? ' first' : statIndex === 2 ? ' last' : '';
+        return (
+          <td
+            key={`${draft}-${stat}`}
+            className={isCounted ? `counted-draft${groupPosition}` : undefined}
+            title={isCounted ? `Draft ${draft} counts toward this player's total` : undefined}
+          >
+            {index === -1 ? '' : row[index]}
+          </td>
+        );
+      }))}
+      <td>{points}</td>
+      {tiebreakers.map(tiebreaker => (
+        <td key={tiebreaker.header}>
+          {tiebreaker.value === 'reportedPods'
+            ? reportedPods
+            : formatDecimal(row[normalizedHeaders.findIndex(header => header === tiebreaker.header)])}
+        </td>
+      ))}
     </tr>
   );
 }
 
-function calculateBestDraftPoints(row, normalizedHeaders, drafts, scoreBestDrafts) {
-  const scores = drafts.map(draft => {
+function getCountedDraftNumbers(row, normalizedHeaders, drafts, countedDrafts) {
+  if (!countedDrafts) {
+    return new Set();
+  }
+
+  return new Set(drafts
+    .map(draft => {
     const indexFor = stat => normalizedHeaders.findIndex(header => header === `draft${draft}${stat}`);
     const wins = parseInt(row[indexFor('wins')] || 0, 10);
     const losses = parseInt(row[indexFor('losses')] || 0, 10);
@@ -359,9 +377,12 @@ function calculateBestDraftPoints(row, normalizedHeaders, drafts, scoreBestDraft
     const byes = parseInt(row[indexFor('byes')] || 0, 10);
     const played = wins + losses + draws > 0;
     const undefeatedBonus = wins === 3 && losses === 0 && draws === 0 && byes === 0;
-    return played ? wins * 3 + draws + (undefeatedBonus ? 1 : 0) : 0;
-  });
-  return scores.sort((a, b) => b - a).slice(0, scoreBestDrafts).reduce((total, score) => total + score, 0);
+    return { draft, played, points: wins * 3 + draws + (undefeatedBonus ? 1 : 0) };
+    })
+    .filter(result => result.played)
+    .sort((a, b) => b.points - a.points || a.draft - b.draft)
+    .slice(0, countedDrafts)
+    .map(result => result.draft));
 }
 
 function countReportedPods(row, normalizedHeaders, drafts) {
