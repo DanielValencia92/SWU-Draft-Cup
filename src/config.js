@@ -1,21 +1,9 @@
 export const sets = [
   {
-    slug: 'ashes-of-the-empire',
-    legacyPath: '/index.html',
-    name: 'Ashes of the Empire',
-    eyebrow: 'Current Season',
-    pageClass: 'page-ashes',
-    csvUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ00F_tYNwL63C2CjGX__uxtcVmDUZTf4HNTrJbz2lNTW86rT5ORKY82JhZyqvlNpR7o-DNWIzHNyTT/pub?gid=0&single=true&output=csv',
-    roster: 'csv',
-    standingsMode: 'tiebreakers',
-    maxDrafts: 5,
-    countedDrafts: 4
-  },
-  {
     slug: 'homeworlds',
     legacyPath: '/season09.html',
     name: 'Homeworlds',
-    eyebrow: 'Upcoming Season',
+    eyebrow: 'Current Season',
     pageClass: 'page-homeworlds',
     csvUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPIYIqo6sZY59Lel6CIwP_EDuyLgF3zDznSVJKrYUr1HMRO5AMBXgsUOnI-N3wES-L9B_An0QlXTK2/pub?gid=0&single=true&output=csv',
     roster: 'csv',
@@ -27,6 +15,18 @@ export const sets = [
       { header: 'tgw', label: 'TGW' },
       { header: 'reportedpods', label: 'Reported Pods' }
     ]
+  },
+  {
+    slug: 'ashes-of-the-empire',
+    legacyPath: '/index.html',
+    name: 'Ashes of the Empire',
+    eyebrow: 'Set Archive',
+    pageClass: 'page-ashes',
+    csvUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ00F_tYNwL63C2CjGX__uxtcVmDUZTf4HNTrJbz2lNTW86rT5ORKY82JhZyqvlNpR7o-DNWIzHNyTT/pub?gid=0&single=true&output=csv',
+    roster: 'csv',
+    standingsMode: 'tiebreakers',
+    maxDrafts: 5,
+    countedDrafts: 4
   },
   {
     slug: 'a-lawless-time',
