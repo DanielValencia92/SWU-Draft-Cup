@@ -25,8 +25,7 @@ export const sets = [
     csvUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ00F_tYNwL63C2CjGX__uxtcVmDUZTf4HNTrJbz2lNTW86rT5ORKY82JhZyqvlNpR7o-DNWIzHNyTT/pub?gid=0&single=true&output=csv',
     roster: 'csv',
     standingsMode: 'tiebreakers',
-    maxDrafts: 5,
-    countedDrafts: 4
+    maxDrafts: 5
   },
   {
     slug: 'a-lawless-time',
