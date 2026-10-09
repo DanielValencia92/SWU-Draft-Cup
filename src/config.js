@@ -17,8 +17,8 @@ export const sets = [
     name: 'Homeworlds',
     eyebrow: 'Upcoming Season',
     pageClass: 'page-homeworlds',
-    csvUrl: '',
-    roster: 'TBD',
+    csvUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPIYIqo6sZY59Lel6CIwP_EDuyLgF3zDznSVJKrYUr1HMRO5AMBXgsUOnI-N3wES-L9B_An0QlXTK2/pub?gid=0&single=true&output=csv',
+    roster: 'csv',
     standingsMode: 'tiebreakers',
     maxDrafts: 5,
     countedDrafts: 4,
@@ -62,4 +62,4 @@ export const sets = [
 
 export const championsCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRJQGgLOqHF_hQOb1FERoz3y8BICFgd7dtax5WNOP1CU48lW9ICm9OEgsK_kcrWllFxCtZY-Cfw1AJy/pub?gid=0&single=true&output=csv';
 
-export const defaultSet = sets[0];
+export const defaultSet = sets.find(set => set.slug === 'homeworlds') || sets[0];
