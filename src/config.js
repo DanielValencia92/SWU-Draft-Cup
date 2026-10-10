@@ -13,7 +13,7 @@ export const sets = [
     tiebreakers: [
       { header: 'omw', label: 'OMW' },
       { header: 'tgw', label: 'TGW' },
-      { header: 'reportedpods', label: 'Reported Pods' }
+      { header: 'reportedpods', label: 'Reported Pods', value: 'reportedPods' }
     ]
   },
   {

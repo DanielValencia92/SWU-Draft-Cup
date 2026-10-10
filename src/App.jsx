@@ -250,6 +250,13 @@ function StandingsPage({ currentSet, navigate }) {
     return sorted;
   }, [currentSet.standingsMode, drafts, headers.length, normalizedHeaders, rows, tiebreakers]);
 
+  const showCountedDraftLegend = useMemo(
+    () => currentSet.countedDrafts && rows.some(row => (
+      countReportedPods(row, normalizedHeaders, drafts) > currentSet.countedDrafts
+    )),
+    [currentSet.countedDrafts, drafts, normalizedHeaders, rows]
+  );
+
   return (
     <>
       <section className="hero">
@@ -271,7 +278,7 @@ function StandingsPage({ currentSet, navigate }) {
             ))}
           </select>
         </div>
-        {currentSet.countedDrafts && (
+        {showCountedDraftLegend && (
           <p className="counted-draft-legend">
             Gold outlines mark the {currentSet.countedDrafts} draft results counted in the sheet total.
           </p>
@@ -283,7 +290,8 @@ function StandingsPage({ currentSet, navigate }) {
       {error && <p className="status error">Error loading standings: {error}</p>}
 
       <section className="surface table-scroll">
-        <table id="standings">
+        <table id="standings" className={`standings-table standings-table--${drafts.length}-drafts`}>
+          <StandingsColGroup drafts={drafts} tiebreakers={tiebreakers} />
           <StandingsHead drafts={drafts} tiebreakers={tiebreakers} />
           <tbody>
             {sortedRows.map(({ row, points, reportedPods }, index) => (
@@ -306,6 +314,29 @@ function StandingsPage({ currentSet, navigate }) {
   );
 }
 
+function StandingsColGroup({ drafts, tiebreakers }) {
+  const isFiveDraftLayout = drafts.length >= 5;
+  const rankWidth = isFiveDraftLayout ? 4.5 : 5;
+  const playerWidth = isFiveDraftLayout ? 10.5 : 14;
+  const pointsWidth = isFiveDraftLayout ? 5.5 : 6;
+  const tiebreakerWidth = isFiveDraftLayout ? 9 : 8;
+  const draftStatWidth = (100 - rankWidth - playerWidth - pointsWidth - (tiebreakerWidth * tiebreakers.length)) / (drafts.length * 3);
+
+  return (
+    <colgroup>
+      <col style={{ width: `${rankWidth}%` }} />
+      <col style={{ width: `${playerWidth}%` }} />
+      {drafts.flatMap(draft => ['wins', 'losses', 'draws'].map(stat => (
+        <col key={`${draft}-${stat}`} style={{ width: `${draftStatWidth}%` }} />
+      )))}
+      <col style={{ width: `${pointsWidth}%` }} />
+      {tiebreakers.map(tiebreaker => (
+        <col key={tiebreaker.header} style={{ width: `${tiebreakerWidth}%` }} />
+      ))}
+    </colgroup>
+  );
+}
+
 function StandingsHead({ drafts, tiebreakers }) {
   return (
     <thead>
@@ -316,12 +347,18 @@ function StandingsHead({ drafts, tiebreakers }) {
           <th key={draft} colSpan="3" className="group-header">Draft {draft}</th>
         ))}
         <th rowSpan="2">Points</th>
-        {tiebreakers.map(tiebreaker => <th key={tiebreaker.header} rowSpan="2">{tiebreaker.label}</th>)}
+        {tiebreakers.map(tiebreaker => (
+          <th key={tiebreaker.header} rowSpan="2">
+            {tiebreaker.header === 'reportedpods'
+              ? <>Reported<br />Pods</>
+              : tiebreaker.label}
+          </th>
+        ))}
       </tr>
       <tr>
         {drafts.flatMap(draft => (
           ['Wins', 'Losses', 'Draws'].map(label => (
-            <th key={`${draft}-${label}`}>{label}</th>
+            <th key={`${draft}-${label}`} title={label} aria-label={label}>{label.charAt(0)}</th>
           ))
         ))}
       </tr>
@@ -368,7 +405,7 @@ function getCountedDraftNumbers(row, normalizedHeaders, drafts, countedDrafts) {
     return new Set();
   }
 
-  return new Set(drafts
+  const reportedDrafts = drafts
     .map(draft => {
     const indexFor = stat => normalizedHeaders.findIndex(header => header === `draft${draft}${stat}`);
     const wins = parseInt(row[indexFor('wins')] || 0, 10);
@@ -379,7 +416,13 @@ function getCountedDraftNumbers(row, normalizedHeaders, drafts, countedDrafts) {
     const undefeatedBonus = wins === 3 && losses === 0 && draws === 0 && byes === 0;
     return { draft, played, points: wins * 3 + draws + (undefeatedBonus ? 1 : 0) };
     })
-    .filter(result => result.played)
+    .filter(result => result.played);
+
+  if (reportedDrafts.length <= countedDrafts) {
+    return new Set();
+  }
+
+  return new Set(reportedDrafts
     .sort((a, b) => b.points - a.points || a.draft - b.draft)
     .slice(0, countedDrafts)
     .map(result => result.draft));

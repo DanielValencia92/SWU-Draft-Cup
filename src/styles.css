@@ -241,6 +241,25 @@ table {
   background: var(--panel-strong);
 }
 
+.standings-table--5-drafts {
+  table-layout: fixed;
+  font-size: 0.8rem;
+}
+
+.standings-table--5-drafts th,
+.standings-table--5-drafts td {
+  padding: 0.56rem 0.22rem;
+}
+
+.standings-table--5-drafts th {
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.standings-table--5-drafts td:nth-child(2) {
+  font-weight: 700;
+}
+
 th,
 td {
   border-bottom: 1px solid rgba(255, 255, 255, 0.11);
@@ -448,6 +467,20 @@ th.group-header {
   td {
     padding: 0.54rem;
     font-size: 0.82rem;
+  }
+
+  .standings-table--5-drafts {
+    table-layout: auto;
+    font-size: 0.82rem;
+  }
+
+  .standings-table--5-drafts th,
+  .standings-table--5-drafts td {
+    padding: 0.54rem;
+  }
+
+  .standings-table--5-drafts th {
+    font-size: 0.78rem;
   }
 
   .rules-panel {
